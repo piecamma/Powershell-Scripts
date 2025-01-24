@@ -1,0 +1,38 @@
+# Define the domains to be examined
+$domains = @("DOMAIN_XXXX1", "DOMAIN_XXXX2")
+
+# Define the groups of interest
+$groups = @("Domain Admins", "Enterprise Admins", "Administrators")
+
+# Path for the CSV file on the current user's desktop
+$outputFile = [System.IO.Path]::Combine($env:USERPROFILE, "Desktop", "output_members.csv")
+
+# Initialize an array to collect the results
+$outputData = @()
+
+# Iterate through each domain and group
+foreach ($domain in $domains) {
+    foreach ($group in $groups) {
+        try {
+            # Get the members of the group
+            $members = Get-ADGroupMember -Identity $group -Server $domain
+
+            # Add each member to the results array
+            $members | ForEach-Object {
+                $outputData += [PSCustomObject]@{
+                    Domain = $domain
+                    Group  = $group
+                    Member = $_.SamAccountName
+                }
+            }
+        }
+        catch {
+            Write-Warning "Error with the group '$group' in domain '$domain'."
+        }
+    }
+}
+
+# Export the data to a CSV file
+$outputData | Export-Csv -Path $outputFile -NoTypeInformation
+
+Write-Host "Export completed to: $outputFile"
