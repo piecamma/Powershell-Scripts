@@ -1,0 +1,83 @@
+# Connection parameters for the domains
+$dominioX = "DOMINIO_X"
+$dominioY = "DOMINIO_Y"
+$dominioXXXX = "DOMINIO_XXXX"
+
+# Username to search
+$nomeUtente = "nome_utente"
+
+# Function to search for a user in a domain
+function Trova-utente {
+    param (
+        [string]$dominio,
+        [string]$utente
+    )
+    try {
+        # Use Get-ADUser to search for the user in the specified domain
+        $user = Get-ADUser -Filter {SamAccountName -eq $utente} -Server $dominio
+        return $user
+    }
+    catch {
+        Write-Host "User not found in domain: $dominio"
+        return $null
+    }
+}
+
+# Function to verify if the user is enabled in the XXXX domain
+function Verifica-Abilitazione {
+    param (
+        [object]$utente
+    )
+    if ($utente) {
+        $primaryDomain = $utente.ExtensionProperty["PrimaryDomain"]
+        if ($primaryDomain -eq "DOMINIO_XXXX") {
+            if ($utente.Enabled -eq $true) {
+                return "The user is enabled in the XXXX domain."
+            }
+            else {
+                return "The user is NOT enabled in the XXXX domain."
+            }
+        }
+        else {
+            return "The user does not belong to the XXXX domain."
+        }
+    }
+    else {
+        return "User not found."
+    }
+}
+
+# Search for the user in domains X and Y
+$utenteX = Trova-utente -dominio $dominioX -utente $nomeUtente
+$utenteY = Trova-utente -dominio $dominioY -utente $nomeUtente
+
+# Search for the user in the XXXX domain
+$utenteXXXX = Trova-utente -dominio $dominioXXXX -utente $nomeUtente
+
+# If the user is NOT found in domains X or Y
+if (-not $utenteX -and -not $utenteY) {
+    Write-Host "Error: User not found in domains X or Y."
+}
+
+# Verify the user's status in the XXXX domain
+if ($utenteXXXX) {
+    Write-Host "User found in the XXXX domain."
+    $statoAbilitazioneXXXX = Verifica-Abilitazione -utente $utenteXXXX
+    Write-Host "User status in the XXXX domain: $statoAbilitazioneXXXX"
+}
+else {
+    Write-Host "User not found in the XXXX domain either."
+}
+
+# If the user is found in domains X or Y, print their status in those domains
+if ($utenteX) {
+    Write-Host "User found in domain X."
+    $statoAbilitazioneX = if ($utenteX.Enabled) { "Enabled" } else { "Disabled" }
+    Write-Host "User status in domain X: $statoAbilitazioneX"
+}
+
+if ($utenteY) {
+    Write-Host "User found in domain Y."
+    $statoAbilitazioneY = if ($utenteY.Enabled) { "Enabled" } else { "Disabled" }
+    Write-Host "User status in domain Y: $statoAbilitazioneY"
+}
