@@ -1,0 +1,82 @@
+
+# Connection parameters for the domains
+$dominioY = ""   # Specify the name of domain Y
+$dominioXxxx = "XXXX.com"
+
+# File paths for input and output
+$outputCsvPath = "C:\Path\results.csv"  # Path for the output CSV
+$inputCsvPath = "C:\Path\checkUsers.csv"  # Path for the input CSV containing usernames
+
+# Import the CSV file with the list of users (ensure the CSV has a column "NomeUtente")
+$listaUtenti = Import-Csv -Path $inputCsvPath -Encoding UTF8
+
+# Check if the input file contains data
+if ($listaUtenti.Count -eq 0) {
+    Write-Host "Error: The input file contains no data."
+    exit
+}
+
+# If the output file already exists, delete and recreate it
+if (Test-Path $outputCsvPath) {
+    Remove-Item -Path $outputCsvPath -Force
+}
+
+# Add a header to the output CSV (if the file does not exist)
+if (-not (Test-Path $outputCsvPath)) {
+    $header = "DisplayName, samaccountName,PrimaryLogin,PrimaryDomain,EnabledXxxx,EnabledPrimaryDomain"
+    $header | Out-File -FilePath $outputCsvPath
+}
+
+# Loop through each user in the input CSV
+foreach ($utente in $listaUtenti) {
+    $nomeUtente = $utente.NomeUtente  # Ensure the column in the CSV is named "NomeUtente"
+    
+    # Search for the user in the XXXX domain
+    $utenteXxxx = Get-ADUser -identity $nomeUtente -Server $dominioXxxx -Properties DisplayName, samaccountname, enabled, PrimaryDomain, distinguishedname, PrimaryLogin | 
+                  select DisplayName, samaccountname, enabled, PrimaryDomain, distinguishedname, PrimaryLogin
+
+    # Preliminary check on the XXXX domain
+    if ($utenteXxxx) {
+        if ($utenteXxxx.Enabled -eq $true) {
+            $statoAbilitazioneXxxx = "Enabled"
+        } else {
+            $statoAbilitazioneXxxx = "Disabled"
+        }
+    } else {
+        $statoAbilitazioneXxxx = "User not found in XXXX domain"
+    }
+
+    # Check the user in domain Y
+    if ($utenteXxxx) {
+        if ($utenteXxxx.PrimaryDomain.ToUpper() -like "*XXXX*") {
+            $statoAbilitazioneY = $statoAbilitazioneXxxx
+        } else {
+            $utenteY = Get-ADUser -identity $utenteXxxx.PrimaryLogin -Server $utenteXxxx.PrimaryDomain -Properties DisplayName, samaccountname, enabled, distinguishedname | 
+                       select DisplayName, samaccountname, enabled, distinguishedname
+
+            if ($utenteY) {
+                $statoAbilitazioneY = if ($utenteY.Enabled) { "Enabled" } else { "Disabled" }
+            } else {
+                $statoAbilitazioneY = "User not found in Y domain"
+            }
+        }
+    }
+
+    # Create an object to export to the CSV
+    $userInfo = New-Object PSObject -property @{
+        DisplayName           = $utenteXxxx.DisplayName
+        samaccountName        = $utenteXxxx.samaccountname
+        PrimaryLogin          = $utenteXxxx.PrimaryLogin
+        PrimaryDomain         = $utenteXxxx.PrimaryDomain
+        EnabledXxxx           = $statoAbilitazioneXxxx
+        EnabledPrimaryDomain  = $statoAbilitazioneY
+    }
+
+    # Export the user data to the output CSV
+    $userInfo | Export-Csv -Path $outputCsvPath -Append -NoTypeInformation
+
+    # Provide feedback on the user's status
+    Write-Host "Checks completed for user: $nomeUtente"
+}
+
+Write-Host "Process completed. Results have been exported to: $outputCsvPath"
